@@ -22,5 +22,10 @@ dependencies = [
     "pillow>=13.0.0",
 ]
 
+[project.optional-dependencies]
+numpy = [
+    "textual-image[numpy]>=0.14.2",
+]
+
 [dependency-groups]
 dev = ["textual-dev>=1.8.0"]

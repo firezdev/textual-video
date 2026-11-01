@@ -6,7 +6,7 @@ from asanypath import AsAnyPath as Path
 from PIL import Image
 
 
-async def _get_size(path: str | Path) -> tuple[int, int]:
+async def get_video_size(path: str | Path) -> tuple[int, int]:
     proc = await create_subprocess_exec(
         "ffprobe",
         "-v",
@@ -25,8 +25,7 @@ async def _get_size(path: str | Path) -> tuple[int, int]:
     return stream["width"], stream["height"]
 
 
-async def iter_frames(path: str | Path, fps: int = 15):
-    width, height = await _get_size(path)
+async def iter_frames(path: str | Path, width: int, height: int, fps: int = 15):
     scale = min(1, 500 / width)
     width, height = round(width * scale / 2) * 2, round(height * scale / 2) * 2
     proc = await create_subprocess_exec(
