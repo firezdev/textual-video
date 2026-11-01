@@ -1,1 +1,1 @@
-from textual_video.player import VideoPlayer
+from textual_video.widgets import VideoPlayer
