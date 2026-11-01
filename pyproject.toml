@@ -11,7 +11,7 @@ name = "textual-video"
 version = "0.1.4"
 description = "Video playback widgets & controls for Textual (textual-image based)"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "textual>=1.0.0,<9.0.0",
     "textual-image~=0.8.5",
@@ -19,4 +19,6 @@ dependencies = [
     "python-ffmpeg>=2.0.12",
     "aio-ffmpeg>=0.1.2",
     "textual-dev[dev]>=1.8.0",
+    "asanypath>=2.5.0",
+    "textual-drivers>=0.10.4",
 ]

@@ -5,3 +5,4 @@ example.py
 dist/
 textual_video.egg-info/
 frames/
+examples/
