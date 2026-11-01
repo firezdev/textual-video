@@ -1,23 +1,59 @@
-from typing import AsyncIterator, cast
+from asyncio import IncompleteReadError, create_subprocess_exec
+from asyncio.subprocess import PIPE
+from json import loads
 
-from aio_ffmpeg import FFmpegClient
 from asanypath import AsAnyPath as Path
+from PIL import Image
 
-client = FFmpegClient()
 
-
-async def save_video_frames(path: Path) -> int:
-    frames: Path = Path("frames") / path.name
-    await frames.mkdir(exist_ok=True, parents=True)
-
-    async for file in cast(AsyncIterator[Path], frames.iterdir()):
-        await file.unlink()
-
-    await (
-        client.pipeline(path)
-        # .video_filter(rf"select='between(n\,{offset}\,{offset + 10})'")
-        .video_filter("fps=15")
-        .output(frames / "%10d.jpg")
-        .run()
+async def _get_size(path: str | Path) -> tuple[int, int]:
+    proc = await create_subprocess_exec(
+        "ffprobe",
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=width,height:stream_side_data=rotation",
+        "-of",
+        "json",
+        path,
+        stdout=PIPE
     )
-    return len([True async for _ in cast(AsyncIterator[Path], frames.glob("*"))])
+    out, _ = await proc.communicate()
+    stream = loads(out)["streams"][0]
+    return stream["width"], stream["height"]
+
+
+async def iter_frames(path: str | Path, fps: int = 15):
+    width, height = await _get_size(path)
+    scale = min(1, 500 / width)
+    width, height = round(width * scale / 2) * 2, round(height * scale / 2) * 2
+    proc = await create_subprocess_exec(
+        "ffmpeg",
+        "-loglevel",
+        "error",
+        "-i",
+        path,
+        "-vf",
+        f"fps={fps},scale={width}:{height}",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "pipe:1",
+        stdout=PIPE
+    )
+    frame_size = width * height * 3
+    try:
+        while True:
+            try:
+                assert proc.stdout
+                data = await proc.stdout.readexactly(frame_size)
+            except IncompleteReadError:
+                break
+            yield Image.frombuffer("RGB", (width, height), data)
+    finally:
+        if proc.returncode is None:
+            proc.kill()
+        await proc.communicate()

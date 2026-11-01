@@ -3,15 +3,6 @@ revision = 5
 requires-python = ">=3.12"
 
 [[package]]
-name = "aio-ffmpeg"
-version = "0.1.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/36/86/814a0d6a9b710bb87cad39d467833d2736446ea04fb0650b614dc6aaee61/aio_ffmpeg-0.1.2.tar.gz", hash = "sha256:0dcc58c80792e443eee6b4baaf211e5465929f494481f2305d8ac16a6c86bffc", size = 307069, upload-time = "2026-09-19T18:18:15.159Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/35/c5/918885ee896a2aeb9d1b28d21e530e2a782077a2bf938c67695c39037e74/aio_ffmpeg-0.1.2-py3-none-any.whl", hash = "sha256:8646d8bc223211e797e3500db7138c50e25a17ef372300e7b6f7a2d9af4f59e4", size = 75882, upload-time = "2026-09-19T18:18:12.545Z" },
-]
-
-[[package]]
 name = "aiohappyeyeballs"
 version = "2.7.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1140,7 +1131,6 @@ name = "textual-video"
 version = "0.1.4"
 source = { editable = "." }
 dependencies = [
-    { name = "aio-ffmpeg" },
     { name = "asanypath" },
     { name = "python-ffmpeg" },
     { name = "textual" },
@@ -1152,7 +1142,6 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aio-ffmpeg", specifier = ">=0.1.2" },
     { name = "asanypath", specifier = ">=2.5.0" },
     { name = "python-ffmpeg", specifier = ">=2.0.12" },
     { name = "textual", specifier = ">=1.0.0,<9.0.0" },

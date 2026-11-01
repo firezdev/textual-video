@@ -17,7 +17,6 @@ dependencies = [
     "textual-image~=0.8.5",
     "textual-canvas~=1.1.0",
     "python-ffmpeg>=2.0.12",
-    "aio-ffmpeg>=0.1.2",
     "textual-dev[dev]>=1.8.0",
     "asanypath>=2.5.0",
     "textual-drivers>=0.10.4",
