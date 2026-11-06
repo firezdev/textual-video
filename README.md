@@ -1,4 +1,5 @@
 # textual-video
+[![AI-DECLARATION: assist](https://img.shields.io/badge/䷼%20AI--DECLARATION-assist-fef9c3?labelColor=fef9c3)](https://ai-declaration.md)
 
 Textual widget for playing videos in terminal UIs. Based on [textual-image](https://github.com/lnqs/textual-image).
 
