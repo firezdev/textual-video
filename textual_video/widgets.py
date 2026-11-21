@@ -5,10 +5,8 @@ from typing import Literal
 from asanypath import AsAnyPath as Path
 from textual import work
 from textual.binding import Binding
-from textual.color import Color
 from textual.widget import Widget
 from textual.widgets import Static
-from textual_canvas import Canvas
 from textual_image.widget import (
     AutoImage,
     BaseImage,
@@ -23,8 +21,27 @@ from textual_video._cell import fit_cells
 from textual_video.core import get_video_meta, iter_frames
 
 
+class VideoTrack(Static):
+    LINE: str = "━"
+    CIRCLE: str | None = "█"
+
+    def set_watched(self, ratio: float):
+        if self.CIRCLE:
+            watched = round(ratio * (self.size.width - 1))
+            self.update(
+                f"[red]{self.LINE * watched}{self.CIRCLE}[grey]{self.LINE * (self.size.width - watched - 1)}"
+            )
+        else:
+            watched = round(self.size.width * ratio)
+            self.update(
+                f"[red]{self.LINE * watched}[grey]{self.LINE * (self.size.width - watched)}"
+            )
+
+
 class VideoPlayer(Widget, can_focus=True):
     BINDINGS = [Binding("space", "toggle_pause")]
+
+    TRACK_CLASS: type[VideoTrack] = VideoTrack
 
     def __init__(
         self,
@@ -74,25 +91,18 @@ class VideoPlayer(Widget, can_focus=True):
         textual_w, textual_h, video_w, video_h = fit_cells(
             original_w, original_h, self.size.width, widget_h
         )
-        self._width = textual_w
 
         image = self.query_one(BaseImage)
         image.styles.width = textual_w
         image.styles.height = textual_h
+        self.query_one(VideoTrack).styles.width = textual_w
 
         self.iterator = iter_frames(self.path, video_w, video_h, self.fps)
         self.timer = self.set_interval(1 / self.fps, self._next_frame)
         self._start = None
         self._paused_at = None
-        await self._init_canvas()
 
-    async def _init_canvas(self):
-        await self.remove_children(Canvas)
-        canvas = Canvas(self._width, 1)
-        self.mount(canvas)
-        canvas.draw_line(0, 0, self._width, 0, Color(127, 127, 127))
-
-    def on_resize(self, event):  # not on mount because we need size
+    def on_resize(self):  # not on_mount because _init needs widget size
         if not self._inited:
             self._init()
 
@@ -121,7 +131,7 @@ class VideoPlayer(Widget, can_focus=True):
                 for _ in range(target - self.frame - 1):
                     await anext(self.iterator)
 
-                self.frame = target
+                self.frame = target - 1
 
             frame = await anext(self.iterator)
             self.frame += 1
@@ -135,13 +145,8 @@ class VideoPlayer(Widget, can_focus=True):
                 self.frame = 0
                 self._init()
 
-        canvas = self.query_one(Canvas)
-        watched = round(self._width * self.frame / self.fps / self.duration)
-
-        if watched < self._width:
-            canvas.draw_line(watched, 0, self._width - 1, 0, Color(127, 127, 127))
-        if watched > 0:
-            canvas.draw_line(0, 0, watched - 1, 0, Color(255, 0, 0))
+        self.log(self.frame / self.fps / self.duration)
+        self.query_one(VideoTrack).set_watched(self.frame / self.fps / self.duration)
 
     def _set_frame(self, image: BytesIO):
         if self.debug_show_fps:
@@ -179,4 +184,4 @@ class VideoPlayer(Widget, can_focus=True):
             case "tgp":
                 yield TGPImage()
 
-        Canvas(1, 1)
+        yield self.TRACK_CLASS()
