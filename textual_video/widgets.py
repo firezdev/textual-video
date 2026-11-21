@@ -235,3 +235,10 @@ class VideoPlayer(Widget, can_focus=True):
 
         yield self.TRACK_CLASS()
         yield self.PLAY_BUTTON()
+
+    async def on_unmount(self):
+        if (timer := getattr(self, "timer", None)) is not None:
+            timer.stop()
+        await self.audio.stop()
+        if (iterator := getattr(self, "iterator", None)) is not None:
+            await iterator.aclose()
