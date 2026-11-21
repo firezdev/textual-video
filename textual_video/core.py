@@ -31,13 +31,15 @@ async def get_video_meta(path: str | Path) -> tuple[int, int, float]:
     )
 
 
-async def iter_frames(path: str | Path, width: int, height: int, fps: int = 15):
-    scale = min(1, 500 / width)
-    width, height = round(width * scale / 2) * 2, round(height * scale / 2) * 2
+async def iter_frames(
+    path: str | Path, width: int, height: int, start: float = 0.0, fps: int = 15
+):
     proc = await create_subprocess_exec(
         "ffmpeg",
         "-loglevel",
         "error",
+        "-ss",
+        str(start),
         "-i",
         path,
         "-vf",

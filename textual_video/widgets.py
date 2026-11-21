@@ -5,6 +5,7 @@ from typing import Literal
 from asanypath import AsAnyPath as Path
 from textual import work
 from textual.binding import Binding
+from textual.containers import Center
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
@@ -68,7 +69,7 @@ class NerdPlayButton(PlayButton):
 
 
 class VideoPlayer(Widget, can_focus=True):
-    BINDINGS = [Binding("space", "toggle_pause")]
+    BINDINGS = [Binding("space", "toggle_pause"), Binding("f", "toggle_fullscreen")]
 
     TRACK_CLASS: type[VideoTrack] = VideoTrack
     PLAY_BUTTON: type[PlayButton] = PlayButton
@@ -104,42 +105,58 @@ class VideoPlayer(Widget, can_focus=True):
         self.frame = 0
         self.paused = False
         self._last_frame_update = monotonic()
-        self._inited = False
         self.debug_show_fps = False
+        self.timer = None
 
         self.styles.layout = "vertical"
 
     @work(exclusive=True)
-    async def _init(self):
+    async def _reload(self):
         self.log("init video", path=self.path)
-        self._inited = True
-        original_w, original_h, self.duration = await get_video_meta(self.path)
-
-        widget_h = self.size.height
-        if self.debug_show_fps:
-            widget_h -= 1
-
         textual_w, textual_h, video_w, video_h = fit_cells(
-            original_w, original_h, self.size.width, widget_h
+            *self._meta,
+            self.size.width,
+            self.size.height - 2 - int(self.debug_show_fps),
+            max_width=None if self.is_maximized else 500,
+            upscale=self.is_maximized
         )
 
         image = self.query_one(BaseImage)
         image.styles.width = textual_w
         image.styles.height = textual_h
-        self.query_one(VideoTrack).styles.width = textual_w
+        row_width = "100%" if self.is_maximized else textual_w
+        self.query_one(Center).styles.width = row_width
+        self.query_one(VideoTrack).styles.width = row_width
+
+        restarting = self.frame > 0  # resized or maximized while playing
+        if self.timer is not None:
+            self.timer.stop()
 
         self.log("start playback")
-        self.iterator = iter_frames(self.path, video_w, video_h, self.fps)
+        self.iterator = iter_frames(
+            self.path, video_w, video_h, start=self.frame / self.fps, fps=self.fps
+        )
         self.timer = self.set_interval(1 / self.fps, self._next_frame)
+
+        if restarting:
+            if self.paused:
+                self.timer.pause()
+            return  # keep the video clock and the audio as they are
+
         self._start = None
         self._paused_at = None
         self._ended = False
 
         await self.audio.start()
 
-    def on_resize(self):  # not on_mount because _init needs widget size
-        if not self._inited:
-            self._init()
+    async def on_mount(self):
+        w, h, self.duration = await get_video_meta(self.path)
+        self._meta = (w, h)
+        self._reload()
+
+    def on_resize(self):
+        if self._meta is not None:
+            self._reload()
 
     async def _next_frame(self):
         if self._start is None:
@@ -175,12 +192,13 @@ class VideoPlayer(Widget, can_focus=True):
 
         except StopAsyncIteration:
             self.log("stop playback")
-            self._ended = True
-            self.action_toggle_pause()
             self.timer.stop()
             if self.repeat:
                 self.frame = 0
-                self._init()
+                self._reload()
+            else:
+                self.action_toggle_pause()
+                self._ended = True
 
         self.query_one(VideoTrack).set_watched(self.frame / self.fps / self.duration)
 
@@ -196,16 +214,17 @@ class VideoPlayer(Widget, can_focus=True):
         self.log("toggle pause")
         if self.paused:
             self._last_frame_update = monotonic()
+            if self._start is not None:
+                assert self._paused_at
+                self._start += monotonic() - self._paused_at
+
             if self._ended:
                 self._ended = False
                 self.frame = 0
-                self._init()
-
-            elif self._start is not None:
-                assert self._paused_at
-                self._start += monotonic() - self._paused_at
+                self._reload()
+            else:
+                self.call_next(self.audio.start, self.frame / self.fps)
             self.timer.resume()
-            self.call_next(self.audio.start, self.frame / self.fps)
 
         else:
             self._paused_at = monotonic()
@@ -218,20 +237,29 @@ class VideoPlayer(Widget, can_focus=True):
     def on_play_button_pressed(self):
         self.action_toggle_pause()
 
+    def action_toggle_fullscreen(self):
+        self.log("toggle fullscreen")
+        if self.is_maximized:
+            self.screen.minimize()
+        else:
+            self.screen.maximize(self)
+        self._reload()
+
     def compose(self):
         if self.debug_show_fps:
             yield Static("FPS: 0")
-        match self.graphics:
-            case "auto":
-                yield AutoImage()
-            case "unicode":
-                yield UnicodeImage()
-            case "halfcell":
-                yield HalfcellImage()
-            case "sixel":
-                yield SixelImage()
-            case "tgp":
-                yield TGPImage()
+        with Center():
+            match self.graphics:
+                case "auto":
+                    yield AutoImage()
+                case "unicode":
+                    yield UnicodeImage()
+                case "halfcell":
+                    yield HalfcellImage()
+                case "sixel":
+                    yield SixelImage()
+                case "tgp":
+                    yield TGPImage()
 
         yield self.TRACK_CLASS()
         yield self.PLAY_BUTTON()
