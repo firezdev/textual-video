@@ -19,6 +19,7 @@ from textual_image.widget import (
     UnicodeImage
 )
 
+from textual_video._audio import AudioPlayer
 from textual_video._cell import fit_cells
 from textual_video.core import get_video_meta, iter_frames
 
@@ -93,6 +94,7 @@ class VideoPlayer(Widget, can_focus=True):
         """
         super().__init__()
         self.path = Path(path)
+        self.audio = AudioPlayer(path)
         self.fps = fps
         self.repeat = repeat
         self.skip_frames = skip_frames
@@ -132,6 +134,8 @@ class VideoPlayer(Widget, can_focus=True):
         self._start = None
         self._paused_at = None
         self._ended = False
+
+        await self.audio.start()
 
     def on_resize(self):  # not on_mount because _init needs widget size
         if not self._inited:
@@ -201,10 +205,12 @@ class VideoPlayer(Widget, can_focus=True):
                 assert self._paused_at
                 self._start += monotonic() - self._paused_at
             self.timer.resume()
+            self.call_next(self.audio.start, self.frame / self.fps)
 
         else:
             self._paused_at = monotonic()
             self.timer.pause()
+            self.call_next(self.audio.stop)
 
         self.paused = not self.paused
         self.query_one(PlayButton).paused = self.paused
