@@ -1,5 +1,5 @@
 from io import BytesIO
-from time import time
+from time import monotonic
 from typing import Literal
 
 from asanypath import AsAnyPath as Path
@@ -53,7 +53,7 @@ class VideoPlayer(Widget, can_focus=True):
 
         self.frame = 0
         self.paused = False
-        self._last_frame_update = time()
+        self._last_frame_update = monotonic()
         self._inited = False
         self.debug_show_fps = False
 
@@ -88,9 +88,9 @@ class VideoPlayer(Widget, can_focus=True):
 
     async def _next_frame(self):
         if self._start is None:
-            self._start = time() - 0.001
+            self._start = monotonic() - 0.001
 
-        target = int((time() - self._start) * self.fps)
+        target = int((monotonic() - self._start) * self.fps)
         if self.frame > target:
             self.log.warning(
                 "skip frames",
@@ -129,19 +129,20 @@ class VideoPlayer(Widget, can_focus=True):
         if self.debug_show_fps:
             self.query_one(
                 Static
-            ).content = f"FPS: {round(1 / (time() - self._last_frame_update), 3)}"
-        self._last_frame_update = time()
+            ).content = f"FPS: {round(1 / (monotonic() - self._last_frame_update), 3)}"
+            self._last_frame_update = monotonic()
         self.query_one(BaseImage).image = image
 
     def action_toggle_pause(self):
         self.log("toggle pause")
         if self.paused:
-            self._last_frame_update = time()
+            self._last_frame_update = monotonic()
             if self._start is not None:
-                self._start += time() - self._paused_at
+                assert self._paused_at
+                self._start += monotonic() - self._paused_at
             self.timer.resume()
         else:
-            self._paused_at = time()
+            self._paused_at = monotonic()
             self.timer.pause()
         self.paused = not self.paused
 
