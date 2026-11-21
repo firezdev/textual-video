@@ -4,6 +4,7 @@ from typing import Literal
 
 from asanypath import AsAnyPath as Path
 from textual import work
+from textual.binding import Binding
 from textual.widget import Widget
 from textual.widgets import Static
 from textual_image.widget import (
@@ -20,7 +21,9 @@ from textual_video._cell import fit_cells
 from textual_video.core import get_video_size, iter_frames
 
 
-class VideoPlayer(Widget):
+class VideoPlayer(Widget, can_focus=True):
+    BINDINGS = [Binding("space", "toggle_pause")]
+
     def __init__(
         self,
         path: str | Path,
@@ -47,7 +50,9 @@ class VideoPlayer(Widget):
         self.skip_frames = skip_frames
         self.graphics = graphics
         self.graphics_sixel_options = sixel_options
+
         self.frame = 0
+        self.paused = False
         self._last_frame_update = time()
         self._inited = False
         self.debug_show_fps = False
@@ -75,6 +80,7 @@ class VideoPlayer(Widget):
         self.iterator = iter_frames(self.path, video_w, video_h, self.fps)
         self.timer = self.set_interval(1 / self.fps, self._next_frame)
         self._start = None
+        self._paused_at = None
 
     def on_resize(self, event):  # not on mount because we need size
         if not self._inited:
@@ -126,6 +132,18 @@ class VideoPlayer(Widget):
             ).content = f"FPS: {round(1 / (time() - self._last_frame_update), 3)}"
         self._last_frame_update = time()
         self.query_one(BaseImage).image = image
+
+    def action_toggle_pause(self):
+        self.log("toggle pause")
+        if self.paused:
+            self._last_frame_update = time()
+            if self._start is not None:
+                self._start += time() - self._paused_at
+            self.timer.resume()
+        else:
+            self._paused_at = time()
+            self.timer.pause()
+        self.paused = not self.paused
 
     def compose(self):
         if self.debug_show_fps:
