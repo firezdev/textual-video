@@ -35,6 +35,7 @@ class VideoPlayer(Widget):
         self.graphics_sixel_options = sixel_options
         self.frame = 0
         self._last_frame_update = time()
+        self.debug_show_fps = False
 
         self.styles.layout = "vertical"
 
@@ -42,8 +43,12 @@ class VideoPlayer(Widget):
     async def _init(self):
         original_w, original_h = await get_video_size(self.path)
 
+        widget_h = self.size.height
+        if self.debug_show_fps:
+            widget_h -= 1
+
         textual_w, textual_h, video_w, video_h = fit_cells(
-            original_w, original_h, self.size.width, self.size.height - 1
+            original_w, original_h, self.size.width, widget_h
         )
 
         image = self.query_one(SixelImage)
@@ -54,7 +59,7 @@ class VideoPlayer(Widget):
         self.timer = self.set_interval(1 / self.fps, self._next_frame)
         self._start = None
 
-    def on_resize(self, event):  # noe on mount because we need size
+    def on_resize(self, event):  # not on mount because we need size
         self._init()
 
     async def _next_frame(self):
@@ -63,8 +68,8 @@ class VideoPlayer(Widget):
 
         target = int((time() - self._start) * self.fps)
         if self.frame > target:
-            self.log.warning("ahead of schedule")
-            return  # ahead
+            self.log.warning("frame update called too early", frame=self.frame)
+            return
 
         try:
             frame = await anext(self.iterator)
@@ -77,14 +82,16 @@ class VideoPlayer(Widget):
             self.log("stop", reason="frames end")
 
     def _set_frame(self, image: BytesIO):
-        self.query_one(
-            Static
-        ).content = f"FPS: {round(1 / (time() - self._last_frame_update), 3)}"
+        if self.debug_show_fps:
+            self.query_one(
+                Static
+            ).content = f"FPS: {round(1 / (time() - self._last_frame_update), 3)}"
         self._last_frame_update = time()
         self.query_one(BaseImage).image = image
 
     def compose(self):
-        yield Static("FPS: 0")
+        if self.debug_show_fps:
+            yield Static("FPS: 0")
         match self.graphics:
             case "auto":
                 yield AutoImage()
