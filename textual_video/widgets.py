@@ -97,10 +97,12 @@ class VideoPlayer(Widget, can_focus=True):
         image.styles.height = textual_h
         self.query_one(VideoTrack).styles.width = textual_w
 
+        self.log("start playback")
         self.iterator = iter_frames(self.path, video_w, video_h, self.fps)
         self.timer = self.set_interval(1 / self.fps, self._next_frame)
         self._start = None
         self._paused_at = None
+        self._ended = False
 
     def on_resize(self):  # not on_mount because _init needs widget size
         if not self._inited:
@@ -139,13 +141,14 @@ class VideoPlayer(Widget, can_focus=True):
             self._set_frame(frame)
 
         except StopAsyncIteration:
+            self.log("stop playback")
+            self._ended = True
+            self.action_toggle_pause()
             self.timer.stop()
-            self.log("stop", reason="frames end")
             if self.repeat:
                 self.frame = 0
                 self._init()
 
-        self.log(self.frame / self.fps / self.duration)
         self.query_one(VideoTrack).set_watched(self.frame / self.fps / self.duration)
 
     def _set_frame(self, image: BytesIO):
@@ -160,10 +163,18 @@ class VideoPlayer(Widget, can_focus=True):
         self.log("toggle pause")
         if self.paused:
             self._last_frame_update = monotonic()
-            if self._start is not None:
+            if self._ended:
+                self._ended = False
+                self.frame = 0
+                self.paused = False
+                self._init()
+                return
+
+            elif self._start is not None:
                 assert self._paused_at
                 self._start += monotonic() - self._paused_at
             self.timer.resume()
+
         else:
             self._paused_at = monotonic()
             self.timer.pause()
