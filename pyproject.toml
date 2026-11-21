@@ -27,4 +27,7 @@ numpy = [
 ]
 
 [dependency-groups]
-dev = ["textual-dev>=1.8.0"]
+dev = [
+    "textual-dev>=1.8.0",
+    "yt-dlp>=2026.10.26",
+]
