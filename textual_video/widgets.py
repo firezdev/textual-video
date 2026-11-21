@@ -25,16 +25,27 @@ class VideoPlayer(Widget):
         self,
         path: str | Path,
         fps: int = 15,
+        skip_frames: bool = False,
         graphics: Literal["auto", "tgp", "sixel", "halfcell", "unicode"] = "auto",
         sixel_options: SixelOptions | None = None
     ):
+        """
+        Args:
+            path (str | Path): Path to video
+            fps (int): Video FPS. Recommended maximum: 30~40, if more video will slow down (if skip_frames=False). Defaults to 15
+            skip_frames (bool): Allow to skip some frames; video may flicker, but duration will be exact on every selected FPS. Defaults to False
+            graphichs (str): Image graphics. Available: "auto", "tgp", "sixel", "halfcell", "unicode". Defaults to auto
+            sixel_options (SixelOptions, optional): Sixel image options; makes sense only when graphics is set to "sixel". Defaults to None
+        """
         super().__init__()
         self.path = Path(path)
         self.fps = fps
+        self.skip_frames = skip_frames
         self.graphics = graphics
         self.graphics_sixel_options = sixel_options
         self.frame = 0
         self._last_frame_update = time()
+        self._inited = False
         self.debug_show_fps = False
 
         self.styles.layout = "vertical"
@@ -42,6 +53,7 @@ class VideoPlayer(Widget):
     @work(exclusive=True)
     async def _init(self):
         self.log("init video", path=self.path)
+        self._inited = True
         original_w, original_h = await get_video_size(self.path)
 
         widget_h = self.size.height
@@ -52,7 +64,7 @@ class VideoPlayer(Widget):
             original_w, original_h, self.size.width, widget_h
         )
 
-        image = self.query_one(SixelImage)
+        image = self.query_one(BaseImage)
         image.styles.width = textual_w
         image.styles.height = textual_h
 
@@ -61,7 +73,8 @@ class VideoPlayer(Widget):
         self._start = None
 
     def on_resize(self, event):  # not on mount because we need size
-        self._init()
+        if not self._inited:
+            self._init()
 
     async def _next_frame(self):
         if self._start is None:
@@ -75,18 +88,21 @@ class VideoPlayer(Widget):
                 frame=self.frame,
                 count=self.frame - target
             )
-            self.frame = target
             return
-        if self.frame < target:
-            self.log.warning(
-                "skip frames",
-                reason="too late",
-                frame=self.frame,
-                count=target - self.frame
-            )
-            self.frame = target
 
         try:
+            if self.skip_frames and self.frame < target - 3:
+                self.log.warning(
+                    "skip frames",
+                    reason="too late",
+                    frame=self.frame,
+                    count=target - self.frame
+                )
+                for _ in range(target - self.frame - 1):
+                    await anext(self.iterator)
+
+                self.frame = target
+
             frame = await anext(self.iterator)
             self.frame += 1
             self.log.debug("update frame", index=self.frame)
