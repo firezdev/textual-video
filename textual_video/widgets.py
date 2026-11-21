@@ -41,6 +41,7 @@ class VideoPlayer(Widget):
 
     @work(exclusive=True)
     async def _init(self):
+        self.log("init video", path=self.path)
         original_w, original_h = await get_video_size(self.path)
 
         widget_h = self.size.height
@@ -68,13 +69,27 @@ class VideoPlayer(Widget):
 
         target = int((time() - self._start) * self.fps)
         if self.frame > target:
-            self.log.warning("frame update called too early", frame=self.frame)
+            self.log.warning(
+                "skip frames",
+                reason="too early",
+                frame=self.frame,
+                count=self.frame - target
+            )
+            self.frame = target
             return
+        if self.frame < target:
+            self.log.warning(
+                "skip frames",
+                reason="too late",
+                frame=self.frame,
+                count=target - self.frame
+            )
+            self.frame = target
 
         try:
             frame = await anext(self.iterator)
             self.frame += 1
-            self.log("update frame", index=self.frame)
+            self.log.debug("update frame", index=self.frame)
             self._set_frame(frame)
 
         except StopAsyncIteration:
