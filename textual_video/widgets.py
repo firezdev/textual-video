@@ -24,22 +24,26 @@ class VideoPlayer(Widget):
     def __init__(
         self,
         path: str | Path,
-        fps: int = 15,
+        *,
+        fps: int = 20,
         skip_frames: bool = False,
+        repeat: bool = False,
         graphics: Literal["auto", "tgp", "sixel", "halfcell", "unicode"] = "auto",
         sixel_options: SixelOptions | None = None
     ):
         """
         Args:
-            path (str | Path): Path to video
-            fps (int): Video FPS. Recommended maximum: 30~40, if more video will slow down (if skip_frames=False). Defaults to 15
-            skip_frames (bool): Allow to skip some frames; video may flicker, but duration will be exact on every selected FPS. Defaults to False
-            graphichs (str): Image graphics. Available: "auto", "tgp", "sixel", "halfcell", "unicode". Defaults to auto
-            sixel_options (SixelOptions, optional): Sixel image options; makes sense only when graphics is set to "sixel". Defaults to None
+            path (str | Path): Path to video.
+            fps (int): Video FPS. Recommended maximum: 30~40, if more video will slow down (if skip_frames=False). Defaults to 20.
+            skip_frames (bool): Allow to skip some frames; video may stutter, but duration will be exact on every selected FPS. Defaults to False.
+            repeat (bool): Start video from beginning when it is ended. Defaults to False.
+            graphics (str): Image redner type: "auto", "tgp", "sixel", "halfcell", or "unicode". Defaults to auto.
+            sixel_options (SixelOptions, optional): Sixel image options; only used when graphics is set to "sixel". Defaults to None.
         """
         super().__init__()
         self.path = Path(path)
         self.fps = fps
+        self.repeat = repeat
         self.skip_frames = skip_frames
         self.graphics = graphics
         self.graphics_sixel_options = sixel_options
@@ -111,6 +115,9 @@ class VideoPlayer(Widget):
         except StopAsyncIteration:
             self.timer.stop()
             self.log("stop", reason="frames end")
+            if self.repeat:
+                self.frame = 0
+                self._init()
 
     def _set_frame(self, image: BytesIO):
         if self.debug_show_fps:
