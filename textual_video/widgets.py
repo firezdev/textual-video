@@ -5,8 +5,10 @@ from typing import Literal
 from asanypath import AsAnyPath as Path
 from textual import work
 from textual.binding import Binding
+from textual.color import Color
 from textual.widget import Widget
 from textual.widgets import Static
+from textual_canvas import Canvas
 from textual_image.widget import (
     AutoImage,
     BaseImage,
@@ -18,7 +20,7 @@ from textual_image.widget import (
 )
 
 from textual_video._cell import fit_cells
-from textual_video.core import get_video_size, iter_frames
+from textual_video.core import get_video_meta, iter_frames
 
 
 class VideoPlayer(Widget, can_focus=True):
@@ -63,7 +65,7 @@ class VideoPlayer(Widget, can_focus=True):
     async def _init(self):
         self.log("init video", path=self.path)
         self._inited = True
-        original_w, original_h = await get_video_size(self.path)
+        original_w, original_h, self.duration = await get_video_meta(self.path)
 
         widget_h = self.size.height
         if self.debug_show_fps:
@@ -72,6 +74,7 @@ class VideoPlayer(Widget, can_focus=True):
         textual_w, textual_h, video_w, video_h = fit_cells(
             original_w, original_h, self.size.width, widget_h
         )
+        self._width = textual_w
 
         image = self.query_one(BaseImage)
         image.styles.width = textual_w
@@ -81,6 +84,13 @@ class VideoPlayer(Widget, can_focus=True):
         self.timer = self.set_interval(1 / self.fps, self._next_frame)
         self._start = None
         self._paused_at = None
+        await self._init_canvas()
+
+    async def _init_canvas(self):
+        await self.remove_children(Canvas)
+        canvas = Canvas(self._width, 1)
+        self.mount(canvas)
+        canvas.draw_line(0, 0, self._width, 0, Color(127, 127, 127))
 
     def on_resize(self, event):  # not on mount because we need size
         if not self._inited:
@@ -125,6 +135,14 @@ class VideoPlayer(Widget, can_focus=True):
                 self.frame = 0
                 self._init()
 
+        canvas = self.query_one(Canvas)
+        watched = round(self._width * self.frame / self.fps / self.duration)
+
+        if watched < self._width:
+            canvas.draw_line(watched, 0, self._width - 1, 0, Color(127, 127, 127))
+        if watched > 0:
+            canvas.draw_line(0, 0, watched - 1, 0, Color(255, 0, 0))
+
     def _set_frame(self, image: BytesIO):
         if self.debug_show_fps:
             self.query_one(
@@ -160,3 +178,5 @@ class VideoPlayer(Widget, can_focus=True):
                 yield SixelImage()
             case "tgp":
                 yield TGPImage()
+
+        Canvas(1, 1)

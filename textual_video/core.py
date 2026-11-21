@@ -9,7 +9,7 @@ from PIL import Image
 PTS_RE = compile(rb"pts_time:\s*([0-9.]+)")
 
 
-async def get_video_size(path: str | Path) -> tuple[int, int]:
+async def get_video_meta(path: str | Path) -> tuple[int, int, float]:
     proc = await create_subprocess_exec(
         "ffprobe",
         "-v",
@@ -17,15 +17,18 @@ async def get_video_size(path: str | Path) -> tuple[int, int]:
         "-select_streams",
         "v:0",
         "-show_entries",
-        "stream=width,height:stream_side_data=rotation",
+        "stream=width,height:format=duration",
         "-of",
         "json",
         path,
         stdout=PIPE
     )
-    out, _ = await proc.communicate()
-    stream = loads(out)["streams"][0]
-    return stream["width"], stream["height"]
+    out = loads((await proc.communicate())[0])
+    return (
+        out["streams"][0]["width"],
+        out["streams"][0]["height"],
+        float(out["format"]["duration"])
+    )
 
 
 async def iter_frames(path: str | Path, width: int, height: int, fps: int = 15):
