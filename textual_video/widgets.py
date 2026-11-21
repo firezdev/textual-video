@@ -5,6 +5,8 @@ from typing import Literal
 from asanypath import AsAnyPath as Path
 from textual import work
 from textual.binding import Binding
+from textual.message import Message
+from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Static
 from textual_image.widget import (
@@ -38,10 +40,37 @@ class VideoTrack(Static):
             )
 
 
+class PlayButton(Static):
+    PLAY = "▶"
+    PAUSE = "⏸"
+    paused = reactive(False)
+    DEFAULT_CSS = """
+    PlayButton {
+        width: auto;
+    }
+    """
+
+    class Pressed(Message):
+        pass
+
+    def render(self):
+        return self.PLAY if self.paused else self.PAUSE
+
+    def on_click(self, event):
+        event.stop()
+        self.post_message(self.Pressed())
+
+
+class NerdPlayButton(PlayButton):
+    PLAY = "\uf04b"
+    PAUSE = "\uf04c"
+
+
 class VideoPlayer(Widget, can_focus=True):
     BINDINGS = [Binding("space", "toggle_pause")]
 
     TRACK_CLASS: type[VideoTrack] = VideoTrack
+    PLAY_BUTTON: type[PlayButton] = PlayButton
 
     def __init__(
         self,
@@ -166,9 +195,7 @@ class VideoPlayer(Widget, can_focus=True):
             if self._ended:
                 self._ended = False
                 self.frame = 0
-                self.paused = False
                 self._init()
-                return
 
             elif self._start is not None:
                 assert self._paused_at
@@ -178,7 +205,12 @@ class VideoPlayer(Widget, can_focus=True):
         else:
             self._paused_at = monotonic()
             self.timer.pause()
+
         self.paused = not self.paused
+        self.query_one(PlayButton).paused = self.paused
+
+    def on_play_button_pressed(self):
+        self.action_toggle_pause()
 
     def compose(self):
         if self.debug_show_fps:
@@ -196,3 +228,4 @@ class VideoPlayer(Widget, can_focus=True):
                 yield TGPImage()
 
         yield self.TRACK_CLASS()
+        yield self.PLAY_BUTTON()
